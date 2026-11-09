@@ -190,6 +190,10 @@ fn cmdRun(allocator: std.mem.Allocator, io: std.Io, id: []const u8, image: []con
             usage();
         spec = types.parseRunSpec(arena, json) catch |err| fail("run {s}: bad spec: {s}", .{ id, @errorName(err) });
     }
+    for ([_]struct { []const u8, ?[]const u8 }{ .{ "entrypoint", spec.entrypoint }, .{ "cmd", spec.cmd } }) |field| {
+        const text = field[1] orelse continue;
+        _ = types.words(arena, text) catch fail("run {s}: {s} has an unterminated quote: {s}", .{ id, field[0], text });
+    }
 
     const code = vz.run(allocator, io, id, image, overrides(spec)) catch |err| fail("run {s}: {s}", .{ id, @errorName(err) });
     std.process.exit(@intCast(code));

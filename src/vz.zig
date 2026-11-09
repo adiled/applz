@@ -212,8 +212,7 @@ fn applyOverrides(arena: std.mem.Allocator, base: CacheMeta, ov: Overrides) !pro
 
 /// Split `s` on ASCII spaces into non-empty tokens, appending to `list`.
 fn splitInto(arena: std.mem.Allocator, list: *std.ArrayList([]const u8), s: []const u8) !void {
-    var it = std.mem.tokenizeScalar(u8, s, ' ');
-    while (it.next()) |tok| try list.append(arena, tok);
+    try list.appendSlice(arena, try types.words(arena, s));
 }
 
 /// The integration core: given an unpacked rootfs and the process to run, build
