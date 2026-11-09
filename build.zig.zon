@@ -1,11 +1,9 @@
 .{
-    .name = .orchd_osx,
-    .fingerprint = 0x33c4862673ba2dd0,
-    .version = "0.4.0",
+    .name = .applz,
+    .fingerprint = 0x2426dda5ea5477f5,
+    .version = "0.1.0",
     .minimum_zig_version = "0.17.1",
 
-    // No dependencies: orchd-osx talks to Virtualization.framework via the
-    // Objective-C runtime and to vminitd over vsock, all hand-built in Zig.
     .dependencies = .{},
 
     .paths = .{""},

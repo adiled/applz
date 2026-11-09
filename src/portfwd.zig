@@ -1,4 +1,4 @@
-//! portfwd.zig — HOST-side TCP port forwarding for orchd-osx.
+//! portfwd.zig — HOST-side TCP port forwarding for applz.
 //!
 //! The VM gets a NAT IP the macOS host can reach directly (e.g.
 //! "192.168.65.5"). To make a container's *published* ports usable from the
@@ -10,7 +10,7 @@
 //! This is HOST code (aarch64-apple-darwin, linked against libc). Rather than
 //! lean on std.net — which is mid-rework in Zig 0.16 and now lives under
 //! std.Io — we talk to the BSD sockets layer through plain `extern "c"`
-//! declarations, the same approach the rest of orchd-osx uses for syscalls
+//! declarations, the same approach the rest of applz uses for syscalls
 //! (see vsock.zig). Blocking sockets + thread-per-connection keeps it simple
 //! and robust; the threads run for the life of the process.
 
@@ -61,7 +61,7 @@ extern "c" fn write(fd: c_int, buf: [*]const u8, nbyte: usize) callconv(.c) isiz
 /// (address orelse "127.0.0.1"):host_port and proxies every accepted TCP
 /// connection to guest_ip:guest_port, copying bytes in both directions.
 /// Best-effort: a port that fails to bind is reported to stderr and skipped.
-/// Threads run for the lifetime of the process (orchd-osx exits when the
+/// Threads run for the lifetime of the process (applz exits when the
 /// container exits, which tears them down); this function returns immediately
 /// after spawning them. guest_ip is copied internally (caller may free it).
 pub fn spawnAll(allocator: std.mem.Allocator, guest_ip: []const u8, fwds: []const Forward) void {

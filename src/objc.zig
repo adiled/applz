@@ -11,7 +11,7 @@
 //!   - autorelease pools
 //!   - a global (non-capturing) completion block + dispatch primitives, so the
 //!     async VZ calls (startWithCompletionHandler:, connectToPort:) can be made
-//!     synchronous. orchd-osx drives one VM per process, so completion results
+//!     synchronous. applz drives one VM per process, so completion results
 //!     can live in module globals reached by a global block (no capturing-block
 //!     ABI needed).
 
@@ -174,7 +174,7 @@ test "class lookup, selector, and msgSend round-trip" {
 
 test "nsString and fileURL build without crashing" {
     if (class("NSString") == null) return error.NoFoundation;
-    const url = fileURL("/tmp/orchd-osx-test");
+    const url = fileURL("/tmp/applz-test");
     // -[NSURL isFileURL] should be YES (1).
     const is_file = msgSend(u8, url, sel("isFileURL"), .{});
     try std.testing.expect(is_file == 1);

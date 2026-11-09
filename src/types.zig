@@ -1,14 +1,23 @@
-//! Shared types — mirrors the JSON schema emitted by the `orch` Rust crate.
-//! Fields match Rust's serde snake_case serialization exactly.
+//! The run spec: what `applz run` needs beyond the image, as JSON. Given as a
+//! file (`--spec <path>`) or inline (`--spec-base64 <data>`) so callers that
+//! put the command in a shell line never have to quote it.
 //!
-//! Identical to orchd-apple/src/types.zig by design: orchd-osx honors the same
-//! Service -> ExecSet contract so the Rust `apple` envelope treats both
-//! co-processes interchangeably. Kept as a separate copy so orchd-osx builds
-//! with zero coupling to orchd-apple's source tree.
+//!   {
+//!     "entrypoint": "/docker-entrypoint.sh",   replaces the image's ENTRYPOINT
+//!     "cmd": "postgres -c fsync=off",           replaces the image's CMD
+//!     "workdir": "/app",
+//!     "user": "999:999",
+//!     "env": ["POSTGRES_PASSWORD=secret"],      appended to the image's env
+//!     "mounts": [{"source": "/Users/me/pg", "destination": "/var/lib/postgresql/data"}],
+//!     "ports": [{"host": 5432, "container": 5432, "address": "127.0.0.1"}],
+//!     "memory": "1G",                           VM RAM: K, M or G
+//!     "cpus": 2,                                vCPUs, rounded up
+//!     "limits": {"nofile": 4096, "nproc": 512, "pids": 256, "io_weight": 100, "cpu_quota": "50%"}
+//!   }
+//!
+//! Every field is optional. Mount sources are host paths, used as given.
 
 const std = @import("std");
-
-// ─── Input: Service (subset of orch types) ─────────────────────────────────
 
 pub const Port = struct {
     address: ?[]const u8 = null,
@@ -16,66 +25,58 @@ pub const Port = struct {
     container: u16,
 };
 
-pub const Volume = struct {
+pub const Mount = struct {
     source: []const u8,
     destination: []const u8,
-    is_named: bool = false,
 };
 
-pub const Resources = struct {
-    memory: ?[]const u8 = null,
-    cpus: ?f64 = null,
-    cpu_quota: ?[]const u8 = null,
-    limit_nofile: ?u64 = null,
-    limit_nproc: ?u64 = null,
-    tasks_max: ?u64 = null,
+pub const Limits = struct {
+    nofile: ?u64 = null,
+    nproc: ?u64 = null,
+    pids: ?u64 = null,
     io_weight: ?u32 = null,
+    cpu_quota: ?[]const u8 = null,
 };
 
-/// A parsed service definition from the orch Orchfile.
-/// `env` is left as a raw JSON Value so we can iterate its keys without
-/// needing a HashMap type in std.json deserialization.
-pub const Service = struct {
-    name: []const u8,
-    mode: []const u8,
-    image: ?[]const u8 = null,
+pub const RunSpec = struct {
     entrypoint: ?[]const u8 = null,
     cmd: ?[]const u8 = null,
-    publish: []const Port = &.{},
-    volumes: []const Volume = &.{},
-    user: ?[]const u8 = null,
     workdir: ?[]const u8 = null,
-    env: std.json.Value = .null,
-    env_files: []const []const u8 = &.{},
-    resources: Resources = .{},
-    recreate: []const u8 = "never",
-    oneshot: bool = false,
+    user: ?[]const u8 = null,
+    env: []const []const u8 = &.{},
+    mounts: []const Mount = &.{},
+    ports: []const Port = &.{},
+    memory: ?[]const u8 = null,
+    cpus: ?f64 = null,
+    limits: Limits = .{},
 };
 
-// ─── Output: ExecSet ───────────────────────────────────────────────────────
+pub fn parseRunSpec(arena: std.mem.Allocator, json: []const u8) !RunSpec {
+    return std.json.parseFromSliceLeaky(RunSpec, arena, json, .{ .allocate = .alloc_always });
+}
 
-/// Mirrors orchd's Rust `ExecSet` struct — serialized as JSON to stdout.
-pub const ExecSet = struct {
-    /// Main process command (ExecStart= / ProgramArguments in launchd).
-    /// Runs in the foreground so the supervisor (launchd/systemd) tracks the PID.
-    start: []const u8,
+test "a run spec takes every field, and none" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const full = try parseRunSpec(a,
+        \\{"entrypoint":"/e.sh","cmd":"serve","workdir":"/app","user":"999",
+        \\ "env":["A=1"],"mounts":[{"source":"/h","destination":"/g"}],
+        \\ "ports":[{"host":8080,"container":80}],"memory":"1G","cpus":1.5,
+        \\ "limits":{"nofile":4096,"pids":64,"cpu_quota":"50%"}}
+    );
+    try std.testing.expectEqualStrings("/e.sh", full.entrypoint.?);
+    try std.testing.expectEqualStrings("A=1", full.env[0]);
+    try std.testing.expectEqualStrings("/g", full.mounts[0].destination);
+    try std.testing.expectEqual(8080, full.ports[0].host);
+    try std.testing.expectEqual(64, full.limits.pids.?);
+    const empty = try parseRunSpec(a, "{}");
+    try std.testing.expectEqual(0, empty.env.len);
+    try std.testing.expectEqual(null, empty.memory);
+}
 
-    /// Pre-start command (ExecStartPre= / analogous in launchd).
-    /// Used for image pull.
-    pre_start: ?[]const u8 = null,
-
-    /// Graceful stop command (ExecStop=).
-    stop: ?[]const u8 = null,
-
-    /// Post-stop cleanup (ExecStopPost=).
-    /// Used to delete the container so the next start gets a fresh one.
-    post_stop: ?[]const u8 = null,
-
-    /// Free all owned strings. Call when the ExecSet was produced by exec_set.build().
-    pub fn deinit(self: ExecSet, allocator: std.mem.Allocator) void {
-        allocator.free(self.start);
-        if (self.pre_start) |s| allocator.free(s);
-        if (self.stop) |s| allocator.free(s);
-        if (self.post_stop) |s| allocator.free(s);
-    }
-};
+test "a run spec refuses fields it does not know, so typos are loud" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    try std.testing.expectError(error.UnknownField, parseRunSpec(arena.allocator(), "{\"volumes\":[]}"));
+}

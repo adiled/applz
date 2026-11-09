@@ -88,8 +88,8 @@ pub const ExecSpec = struct {
             try putStr(allocator, &buf, m.dest);
         }
         inline for (.{
-            self.limits.memory_max,    self.limits.cpu_quota_us, self.limits.cpu_period_us,
-            self.limits.pids_max,      self.limits.io_weight,    self.limits.nofile,
+            self.limits.memory_max, self.limits.cpu_quota_us, self.limits.cpu_period_us,
+            self.limits.pids_max,   self.limits.io_weight,    self.limits.nofile,
             self.limits.nproc,
         }) |v| {
             try buf.appendSlice(allocator, &std.mem.toBytes(@as(u64, v)));
@@ -188,7 +188,7 @@ pub const Frame = struct {
 pub fn writeFrame(fd: fd_t, t: MsgType, payload: []const u8) !void {
     var hdr: [5]u8 = undefined;
     std.mem.writeInt(u32, hdr[0..4], @intCast(payload.len + 1), .little);
-    hdr[4] = @intFromEnum(t);
+    hdr[4] = @backingInt(t);
     try writeAll(fd, &hdr);
     try writeAll(fd, payload);
 }
@@ -203,7 +203,7 @@ pub fn readFrame(allocator: std.mem.Allocator, fd: fd_t) !?Frame {
     const body = try allocator.alloc(u8, len - 1);
     errdefer allocator.free(body);
     if (!try readAllOrEof(fd, body)) return error.Truncated;
-    return .{ .type = @enumFromInt(hdr[4]), .body = body };
+    return .{ .type = @fromBackingInt(@intCast(hdr[4])), .body = body };
 }
 
 fn writeAll(fd: fd_t, bytes: []const u8) !void {

@@ -1262,7 +1262,7 @@ test "unpackLayout: single manifest without platform falls back to first" {
 // Pulls docker.io/library/alpine:latest over the network and asserts the
 // unpacked rootfs. Network is available in this environment and curl uses the
 // OS TLS stack, so this runs by default. If you need to skip it on an offline
-// box, set ORCHD_OCI_SKIP_NET=1.
+// box, set APPLZ_OCI_SKIP_NET=1.
 
 test "resolve: pulls alpine:latest and unpacks a real rootfs" {
     const a = std.testing.allocator;
@@ -1270,7 +1270,7 @@ test "resolve: pulls alpine:latest and unpacks a real rootfs" {
     defer threaded.deinit();
     const io = threaded.io();
 
-    if (std.c.getenv("ORCHD_OCI_SKIP_NET") != null) return error.SkipZigTest;
+    if (std.c.getenv("APPLZ_OCI_SKIP_NET") != null) return error.SkipZigTest;
 
     const work_dir = "oci_test_net_work";
     std.Io.Dir.cwd().deleteTree(io, work_dir) catch {};

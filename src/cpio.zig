@@ -3,7 +3,7 @@
 //! The kernel unpacks this into a tmpfs root and runs /init from it. The newc
 //! format is simple ASCII headers + file data, so unlike a block filesystem it
 //! is correct-by-construction: no superblock/bitmap/inode-table to get subtly
-//! wrong. It is the rootfs transport for orchd-osx. Note: the initramfs loads
+//! wrong. It is the rootfs transport for applz. Note: the initramfs loads
 //! fully into RAM, so very large images need a matching VM memory size.
 //!
 //! newc entry: "070701" + 13 x 8-hex fields + name(+NUL), padded to 4 bytes,

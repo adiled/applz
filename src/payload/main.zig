@@ -5,7 +5,7 @@
 const std = @import("std");
 
 pub fn main() void {
-    const msg = "hello from inside the orchd-osx container\n";
+    const msg = "hello from inside the applz container\n";
     _ = std.os.linux.write(1, msg.ptr, msg.len);
     std.os.linux.exit(7);
 }

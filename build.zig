@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // ── Host binary: orchd-osx (macOS) ──────────────────────────────────────
+    // ── Host binary: applz (macOS) ──────────────────────────────────────
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -16,9 +16,12 @@ pub fn build(b: *std.Build) void {
     // framework is linked up front so building out vz.zig needs no build edits.
     exe_mod.linkFramework("Virtualization", .{});
     exe_mod.linkFramework("Foundation", .{});
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", @import("build.zig.zon").version);
+    exe_mod.addOptions("build_options", options);
 
     const exe = b.addExecutable(.{
-        .name = "orchd-osx",
+        .name = "applz",
         .root_module = exe_mod,
     });
     b.installArtifact(exe);
@@ -26,10 +29,10 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     run_cmd.addPassthruArgs();
-    const run_step = b.step("run", "Run orchd-osx");
+    const run_step = b.step("run", "Run applz");
     run_step.dependOn(&run_cmd.step);
 
-    // ── Guest binary: orchd-osx-init (static aarch64-linux, our PID 1) ───────
+    // ── Guest binary: applz-init (static aarch64-linux, our PID 1) ───────
     const guest_target = b.resolveTargetQuery(.{
         .cpu_arch = .aarch64,
         .os_tag = .linux,
@@ -38,7 +41,7 @@ pub fn build(b: *std.Build) void {
     // proto.zig is the shared wire contract; the guest imports it as a module
     // (cross-directory @import is not allowed, so it is passed by name).
     const guest = b.addExecutable(.{
-        .name = "orchd-osx-init",
+        .name = "applz-init",
         .root_module = guestModule(b, guest_target, optimize),
     });
     b.installArtifact(guest);
@@ -46,7 +49,7 @@ pub fn build(b: *std.Build) void {
     // Test payload: a tiny static aarch64-linux binary the guest init execs to
     // prove the full pipeline (cpio -> boot -> vsock -> init -> exec -> exit).
     const payload = b.addExecutable(.{
-        .name = "orchd-osx-payload",
+        .name = "applz-payload",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/payload/main.zig"),
             .target = guest_target,
@@ -60,7 +63,7 @@ pub fn build(b: *std.Build) void {
 
     // Plain host test modules (no framework needed).
     for ([_][]const u8{
-        "src/exec_set.zig",
+        "src/types.zig",
         "src/proto.zig",
         "src/vsock.zig",
         "src/kernel.zig",

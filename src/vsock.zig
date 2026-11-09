@@ -45,7 +45,7 @@ pub fn run(
             .stdout => try writeAll(out_fd, frame.body),
             .stderr => try writeAll(err_fd, frame.body),
             .ipinfo => {
-                std.debug.print("orchd-osx: container ip {s}\n", .{frame.body});
+                std.debug.print("applz: container ip {s}\n", .{frame.body});
                 // Now that we know the guest IP, stand up host->guest port
                 // forwarders for the published ports (spawnAll copies the ip).
                 if (publish.len > 0) portfwd.spawnAll(allocator, frame.body, publish);

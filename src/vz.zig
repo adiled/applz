@@ -1,7 +1,7 @@
-//! vz.zig — the lifecycle facade for orchd-osx. Composes the modules into the
-//! run/wait/stop/delete verbs orchd drives.
+//! vz.zig — the lifecycle facade for applz. Composes the modules into the
+//! run/stop/delete verbs the applz CLI exposes.
 //!
-//! Unlike the XPC path (where the daemon holds the container), an orchd-osx VM
+//! Unlike the XPC path (where the daemon holds the container), an applz VM
 //! lives INSIDE the `run` process: run boots the VM, runs the container's
 //! process over vsock, and blocks until it exits. So `run` is the foreground
 //! process launchd tracks, and it returns the container's exit code. `wait` is
@@ -35,11 +35,11 @@ extern "c" fn _exit(code: c_int) noreturn;
 const SIGTERM: c_int = 15;
 const SIGINT: c_int = 2;
 
-// The active run's pidfile, so the SIGTERM handler can clean it up. orchd-osx
+// The active run's pidfile, so the SIGTERM handler can clean it up. applz
 // runs one container per process.
 var g_pidfile: ?[:0]const u8 = null;
 
-/// On stop (SIGTERM from `orchd-osx stop`, or launchd), unlink the pidfile and
+/// On stop (SIGTERM from `applz stop`, or launchd), unlink the pidfile and
 /// exit. The VM is owned by this process, so exiting tears it down cleanly with
 /// no orphan (unlike the daemon model).
 fn onTerm(_: c_int) callconv(.c) void {
@@ -96,9 +96,9 @@ pub const Overrides = struct {
     user: ?[]const u8 = null,
     /// cgroup v2 + rlimit caps applied by the guest (from resources.*).
     limits: proto.Limits = .{},
-    /// Host directories to share into the guest via virtio-fs (service.volumes).
-    volumes: []const types.Volume = &.{},
-    /// Ports to forward host->guest (from service.publish).
+    /// Host directories to share into the guest via virtio-fs.
+    mounts: []const types.Mount = &.{},
+    /// Ports to forward host->guest.
     publish: []const types.Port = &.{},
 };
 
@@ -106,7 +106,7 @@ pub const Overrides = struct {
 /// exit code. This is the foreground process launchd tracks.
 ///
 /// Images are cached: the unpacked rootfs + its config live under
-/// ~/.orch/osx/images/<ref>, so an image is pulled at most once. `ov` layers the
+/// ~/.applz/images/<ref>, so an image is pulled at most once. `ov` layers the
 /// Service config (env/cmd/entrypoint/workdir) on top of the image defaults.
 pub fn run(allocator: std.mem.Allocator, io: std.Io, id: []const u8, image: []const u8, ov: Overrides) Error!i64 {
     // Ensure the image is pulled + cached (no-op if already cached).
@@ -134,7 +134,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, id: []const u8, image: []co
     // tag per volume links the two ends.
     var shares: std.ArrayList(vm.Share) = .empty;
     var mounts: std.ArrayList(proto.Mount) = .empty;
-    for (ov.volumes, 0..) |vol, i| {
+    for (ov.mounts, 0..) |vol, i| {
         const tag_s = std.fmt.allocPrint(arena, "vol{d}", .{i}) catch continue;
         const tag = arena.dupeSentinel(u8, tag_s, 0) catch continue;
         const host = arena.dupeSentinel(u8, vol.source, 0) catch continue;
@@ -170,7 +170,7 @@ pub fn pullImage(allocator: std.mem.Allocator, io: std.Io, image: []const u8) Er
 
     makePath(io, cache);
     const img = oci.resolve(allocator, io, cache, image) catch |e| {
-        std.debug.print("orchd-osx pull: image resolve failed ({s})\n", .{@errorName(e)});
+        std.debug.print("applz pull: image resolve failed ({s})\n", .{@errorName(e)});
         return Error.ImageFailed;
     };
     const base = CacheMeta{ .entrypoint = img.entrypoint, .cmd = img.cmd, .env = img.env, .cwd = img.cwd };
@@ -230,7 +230,7 @@ pub fn runRootfs(
     defer allocator.free(work);
     makePath(io, work);
 
-    // pidfile + signal handlers: `orchd-osx stop <id>` (or launchd) SIGTERMs
+    // pidfile + signal handlers: `applz stop <id>` (or launchd) SIGTERMs
     // this process; we exit and the VM dies with us. This is the up/down
     // interface: run holds the container, stop ends it.
     const pidfile = std.fmt.allocPrint(allocator, "{s}/pid", .{work}) catch null;
@@ -252,13 +252,13 @@ pub fn runRootfs(
     const cpio_path = try std.fmt.allocPrint(allocator, "{s}/rootfs.cpio", .{work});
     defer allocator.free(cpio_path);
     const init_bytes = readInitBytes(allocator, io) catch |e| {
-        std.debug.print("orchd-osx run: cannot read guest init ({s})\n", .{@errorName(e)});
+        std.debug.print("applz run: cannot read guest init ({s})\n", .{@errorName(e)});
         return Error.RootfsFailed;
     };
     defer allocator.free(init_bytes);
 
     cpio.build(allocator, io, rootfs_dir, cpio_path, init_bytes) catch |e| {
-        std.debug.print("orchd-osx run: initramfs build failed ({s})\n", .{@errorName(e)});
+        std.debug.print("applz run: initramfs build failed ({s})\n", .{@errorName(e)});
         return Error.RootfsFailed;
     };
 
@@ -280,19 +280,19 @@ pub fn runRootfs(
         .vsock_port = VSOCK_PORT,
         .shares = opts.shares,
     }) catch |e| {
-        std.debug.print("orchd-osx run: VM boot failed ({s})\n", .{@errorName(e)});
+        std.debug.print("applz run: VM boot failed ({s})\n", .{@errorName(e)});
         return Error.BootFailed;
     };
     defer machine.shutdown();
 
     // 3. Connect to the guest init and run the process.
     const fd = machine.connect(VSOCK_PORT) catch |e| {
-        std.debug.print("orchd-osx run: vsock connect failed ({s})\n", .{@errorName(e)});
+        std.debug.print("applz run: vsock connect failed ({s})\n", .{@errorName(e)});
         return Error.ExecFailed;
     };
 
     const code = vsock.runStdio(allocator, fd, spec, opts.publish) catch |e| {
-        std.debug.print("orchd-osx run: exec over vsock failed ({s})\n", .{@errorName(e)});
+        std.debug.print("applz run: exec over vsock failed ({s})\n", .{@errorName(e)});
         return Error.ExecFailed;
     };
     return code;
@@ -339,7 +339,7 @@ pub fn available() bool {
 fn workDir(allocator: std.mem.Allocator, id: []const u8) Error![]u8 {
     const home_z = getenv("HOME") orelse return Error.NoHome;
     const home = std.mem.span(home_z);
-    return std.fmt.allocPrint(allocator, "{s}/.orch/osx/run/{s}", .{ home, id }) catch
+    return std.fmt.allocPrint(allocator, "{s}/.applz/run/{s}", .{ home, id }) catch
         return Error.OutOfMemory;
 }
 
@@ -352,7 +352,7 @@ fn imageCacheDir(allocator: std.mem.Allocator, image: []const u8) Error![]u8 {
     for (safe) |*c| {
         if (!std.ascii.isAlphanumeric(c.*) and c.* != '.' and c.* != '-' and c.* != '_') c.* = '_';
     }
-    return std.fmt.allocPrint(allocator, "{s}/.orch/osx/images/{s}", .{ home, safe }) catch
+    return std.fmt.allocPrint(allocator, "{s}/.applz/images/{s}", .{ home, safe }) catch
         return Error.OutOfMemory;
 }
 
@@ -377,14 +377,14 @@ fn writePidfile(io: std.Io, path: [:0]const u8) void {
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = s }) catch {};
 }
 
-/// Read the guest init binary bytes: $ORCHD_OSX_INIT, else next to this exe.
+/// Read the guest init binary bytes: $APPLZ_INIT, else next to this exe.
 fn readInitBytes(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
-    if (getenv("ORCHD_OSX_INIT")) |p| {
+    if (getenv("APPLZ_INIT")) |p| {
         return std.Io.Dir.cwd().readFileAlloc(io, std.mem.span(p), allocator, .unlimited);
     }
     const dir = try std.process.executableDirPathAlloc(io, allocator);
     defer allocator.free(dir);
-    const path = try std.fmt.allocPrint(allocator, "{s}/orchd-osx-init", .{dir});
+    const path = try std.fmt.allocPrint(allocator, "{s}/applz-init", .{dir});
     defer allocator.free(path);
     return std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .unlimited);
 }

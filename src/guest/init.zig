@@ -42,7 +42,7 @@ pub fn main() void {
     // PID 1 must never panic-exit silently. Funnel every error to the serial
     // console, then power off so the host stops waiting on a dead VM.
     run() catch |err| {
-        report("orchd-init: fatal: ");
+        report("applz-init: fatal: ");
         report(@errorName(err));
         report("\n");
     };
@@ -101,7 +101,7 @@ fn mountShares(a: std.mem.Allocator, mounts: []const proto.Mount) void {
         const dest = dupZ(a, m.dest) catch continue;
         defer a.free(dest);
         if (linux.errno(linux.mount(tag.ptr, dest.ptr, "virtiofs", 0, 0)) != .SUCCESS) {
-            report("orchd-init: virtiofs mount failed: ");
+            report("applz-init: virtiofs mount failed: ");
             report(m.dest);
             report("\n");
         }
@@ -187,7 +187,7 @@ const Rlimit64 = extern struct { cur: u64, max: u64 };
 fn setLimit(resource: usize, val: u64) void {
     const rl = Rlimit64{ .cur = val, .max = val };
     const r = linux.syscall4(.prlimit64, 0, resource, @intFromPtr(&rl), 0);
-    if (linux.errno(r) != .SUCCESS) report("orchd-init: setrlimit failed\n");
+    if (linux.errno(r) != .SUCCESS) report("applz-init: setrlimit failed\n");
 }
 
 fn applyLimits(limits: proto.Limits) void {
@@ -286,7 +286,7 @@ fn parseUser(user: []const u8) ?Ids {
 fn applyUser(user: []const u8) void {
     if (user.len == 0) return;
     const ids = parseUser(user) orelse {
-        report("orchd-init: user parse failed: ");
+        report("applz-init: user parse failed: ");
         report(user);
         report("\n");
         return;
@@ -294,14 +294,14 @@ fn applyUser(user: []const u8) void {
     const sg = linux.syscall2(.setgroups, 0, 0);
     const rg = linux.syscall1(.setgid, ids.gid);
     const ru = linux.syscall1(.setuid, ids.uid);
-    if (linux.errno(sg) != .SUCCESS) report("orchd-init: setgroups failed\n");
-    if (linux.errno(rg) != .SUCCESS) report("orchd-init: setgid failed\n");
-    if (linux.errno(ru) != .SUCCESS) report("orchd-init: setuid failed\n");
+    if (linux.errno(sg) != .SUCCESS) report("applz-init: setgroups failed\n");
+    if (linux.errno(rg) != .SUCCESS) report("applz-init: setgid failed\n");
+    if (linux.errno(ru) != .SUCCESS) report("applz-init: setuid failed\n");
 }
 
 // ── cgroup v2 caps (unified hierarchy at /sys/fs/cgroup) ────────────────────
 
-const cgroup_dir = "/sys/fs/cgroup/orchd";
+const cgroup_dir = "/sys/fs/cgroup/applz";
 
 /// Open `path`, write `data`, close. Best-effort (cgroup files reject some
 /// writes depending on controller availability; we never make it fatal).
@@ -483,7 +483,7 @@ fn streamStdio(conn: fd_t, out_fd: fd_t, err_fd: fd_t) !void {
 fn writeFrame(fd: fd_t, t: proto.MsgType, payload: []const u8) !void {
     var hdr: [5]u8 = undefined;
     std.mem.writeInt(u32, hdr[0..4], @intCast(payload.len + 1), .little);
-    hdr[4] = @intFromEnum(t);
+    hdr[4] = @backingInt(t);
     try writeAll(fd, &hdr);
     try writeAll(fd, payload);
 }
@@ -496,7 +496,7 @@ fn readFrame(a: std.mem.Allocator, fd: fd_t) !?proto.Frame {
     const body = try a.alloc(u8, len - 1);
     errdefer a.free(body);
     if (!try readAllOrEof(fd, body)) return error.Truncated;
-    return .{ .type = @enumFromInt(hdr[4]), .body = body };
+    return .{ .type = @fromBackingInt(@intCast(hdr[4])), .body = body };
 }
 
 fn writeAll(fd: fd_t, bytes: []const u8) !void {

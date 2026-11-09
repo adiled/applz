@@ -53,7 +53,7 @@ extern "c" fn dispatch_async(queue: objc.dispatch_queue_t, block: ?objc.Id) void
 
 // --- module globals reached by the global completion blocks ---
 //
-// orchd-osx drives exactly one VM per process, so the async VZ completion
+// applz drives exactly one VM per process, so the async VZ completion
 // results can live here and be read after the matching semaphore wakes us.
 // A global, non-capturing block has no other way to return a value.
 
@@ -416,7 +416,7 @@ pub fn boot(spec: BootSpec) Error!Vm {
     if (ok == 0 or verr != null) return Error.BootFailed;
 
     // Init the VM on a dedicated serial queue. All ops happen on this queue.
-    const queue = objc.dispatch_queue_create("com.orchd.vm", null);
+    const queue = objc.dispatch_queue_create("com.applz.vm", null);
     const vm_cls = objc.class("VZVirtualMachine") orelse return Error.BootFailed;
     const vm_alloc = objc.msgSend(?objc.Id, vm_cls, objc.sel("alloc"), .{}) orelse return Error.BootFailed;
     const vm = objc.msgSend(
@@ -454,9 +454,9 @@ test "build a VZVirtualMachineConfiguration without crashing" {
     if (objc.class("VZVirtualMachineConfiguration") == null) return error.NoVirtualization;
 
     const spec = BootSpec{
-        .kernel_path = "/tmp/orchd-osx-nonexistent-kernel",
-        .cmdline = "console=hvc0 root=/dev/vda rw init=/orchd-init",
-        .rootfs_path = "/tmp/orchd-osx-nonexistent-rootfs.img",
+        .kernel_path = "/tmp/applz-nonexistent-kernel",
+        .cmdline = "console=hvc0 root=/dev/vda rw init=/applz-init",
+        .rootfs_path = "/tmp/applz-nonexistent-rootfs.img",
         .cpu_count = 2,
         .memory_bytes = 512 * 1024 * 1024,
         .vsock_port = 1024,
