@@ -55,11 +55,6 @@ applz check
 together. Images are cached under `~/.applz/images`, running containers under
 `~/.applz/run`.
 
-## With orchd
-
-[orchd](https://github.com/adiled/orchd) ships `orchd-rootstock-applz`, which
-turns Orchfile services into applz runs: `orchd grow --rootstock applz`.
-
 ## How it works
 
 [`DESIGN.md`](DESIGN.md).
