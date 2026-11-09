@@ -71,8 +71,7 @@ Requirements: a pinned kernel asset (`kernel.zig`, see below) and the
 `com.apple.security.virtualization` entitlement (ad-hoc codesign via
 `scripts/sign.sh`).
 
-See `STRESS_TEST_GROUND_0.md` for the load/robustness validation (run when
-applz was still orchd's `osx` mode).
+See `STRESS_TEST_GROUND_0.md` for the load/robustness validation.
 
 One job per module. Boundaries are contracts: a module knows only the layer
 directly below it, never reaches past it. The unsafe and the OS-specific are
