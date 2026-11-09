@@ -3,18 +3,14 @@
 //! put the command in a shell line never have to quote it.
 //!
 //!   {
-//!     "entrypoint": "/docker-entrypoint.sh",   replaces the image's ENTRYPOINT
-//!     "cmd": "postgres -c fsync=off",           replaces the image's CMD
-//!     "workdir": "/app",
-//!     "user": "999:999",
-//!     "env": ["POSTGRES_PASSWORD=secret"],      appended to the image's env
-//!     "mounts": [{"source": "/Users/me/pg", "destination": "/var/lib/postgresql/data"}],
-//!     "ports": [{"host": 5432, "container": 5432, "address": "127.0.0.1"}],
-//!     "memory": "1G",                           VM RAM: K, M or G
-//!     "cpus": 2,                                vCPUs, rounded up
-//!     "limits": {"nofile": 4096, "nproc": 512, "pids": 256, "io_weight": 100, "cpu_quota": "50%"}
+//!     "mounts": [{"source": "/Users/me/site", "destination": "/usr/share/nginx/html"}],
+//!     "ports": [{"host": 8080, "container": 80}],
+//!     "memory": "256M",
+//!     "cpus": 1
 //!   }
 //!
+//! The rest: env (["KEY=value"]), user, workdir, entrypoint, cmd, and limits
+//! (nofile, nproc, pids, io_weight, cpu_quota).
 //! Every field is optional. Mount sources are host paths, used as given.
 
 const std = @import("std");

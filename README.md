@@ -10,35 +10,38 @@ the VM lives exactly as long as `applz run`, so whatever runs `applz run`
 beyond macOS itself.
 
 ```sh
-applz pull postgres:16
-applz run db postgres:16 --spec db.json      # foreground; exits with the container
-applz stop db
-applz rm db
+applz pull nginx:alpine
+applz run site nginx:alpine --spec site.json   # foreground; exits with the container
+applz stop site
+applz rm site
 ```
 
 ## The run spec
 
 Everything beyond the image is one JSON document, given as a file
 (`--spec <path>`) or inline (`--spec-base64 <data>`, for callers that put the
-command in a shell line):
+command in a shell line). Serving a folder from your Mac:
 
 ```json
 {
-  "env": ["POSTGRES_PASSWORD=secret"],
-  "mounts": [{ "source": "/Users/me/pg", "destination": "/var/lib/postgresql/data" }],
-  "ports": [{ "host": 5432, "container": 5432, "address": "127.0.0.1" }],
-  "memory": "1G",
-  "cpus": 2,
-  "user": "999:999",
-  "workdir": "/var/lib/postgresql",
-  "entrypoint": "docker-entrypoint.sh",
-  "cmd": "postgres -c fsync=off",
-  "limits": { "nofile": 4096, "nproc": 512, "pids": 256, "io_weight": 100, "cpu_quota": "50%" }
+  "mounts": [{ "source": "/Users/me/site", "destination": "/usr/share/nginx/html" }],
+  "ports": [{ "host": 8080, "container": 80 }],
+  "memory": "256M",
+  "cpus": 1
 }
 ```
 
+| Field | Meaning |
+|---|---|
+| `env` | `["KEY=value", …]`, added to the image's own |
+| `mounts` | host folders shared into the container: `source` → `destination` |
+| `ports` | `host` port forwarded to the container's, on `address` (default 127.0.0.1) |
+| `memory`, `cpus` | the VM's size: `256M`, `1G`; vCPUs rounded up |
+| `user`, `workdir` | who the process runs as, and where |
+| `entrypoint`, `cmd` | replace the image's, split into words like a shell |
+| `limits` | `nofile`, `nproc`, `pids`, `io_weight`, `cpu_quota` (`"50%"`) |
+
 Every field is optional, and an unknown field is an error, so a typo is loud.
-`env` is added to the image's own; `entrypoint` and `cmd` replace the image's.
 
 ## Install
 
