@@ -138,7 +138,7 @@ pub fn run(allocator: std.mem.Allocator, io: std.Io, id: []const u8, image: []co
         const tag_s = std.fmt.allocPrint(arena, "vol{d}", .{i}) catch continue;
         const tag = arena.dupeSentinel(u8, tag_s, 0) catch continue;
         const host = arena.dupeSentinel(u8, vol.source, 0) catch continue;
-        shares.append(arena, .{ .tag = tag, .host_path = host }) catch continue;
+        shares.append(arena, .{ .tag = tag, .host_path = host, .read_only = vol.read_only }) catch continue;
         mounts.append(arena, .{ .tag = tag, .dest = vol.destination }) catch continue;
     }
     spec.mounts = mounts.items;

@@ -27,6 +27,7 @@ pub const Error = error{ NotImplemented, BootFailed, ConnectFailed };
 pub const Share = struct {
     tag: [:0]const u8,
     host_path: [:0]const u8,
+    read_only: bool = false,
 };
 
 pub const BootSpec = struct {
@@ -260,7 +261,7 @@ fn buildConfig(spec: BootSpec) BuildError!objc.Id {
 }
 
 /// Build a VZVirtioFileSystemDeviceConfiguration for one share: a
-/// VZSingleDirectoryShare over a VZSharedDirectory(host_path, readOnly=NO),
+/// VZSingleDirectoryShare over a VZSharedDirectory(host_path, read_only),
 /// tagged so the guest can `mount -t virtiofs <tag>`. Returns null if any class
 /// is unavailable (older macOS); the share is then simply skipped.
 fn buildFsDevice(share: Share) ?objc.Id {
@@ -270,7 +271,7 @@ fn buildFsDevice(share: Share) ?objc.Id {
 
     const sd_cls = objc.class("VZSharedDirectory") orelse return null;
     const sd_alloc = objc.msgSend(?objc.Id, sd_cls, objc.sel("alloc"), .{}) orelse return null;
-    const shared = objc.msgSend(?objc.Id, sd_alloc, objc.sel("initWithURL:readOnly:"), .{ objc.fileURL(share.host_path), @as(u8, 0) }) orelse return null;
+    const shared = objc.msgSend(?objc.Id, sd_alloc, objc.sel("initWithURL:readOnly:"), .{ objc.fileURL(share.host_path), @as(u8, @intFromBool(share.read_only)) }) orelse return null;
 
     const single_cls = objc.class("VZSingleDirectoryShare") orelse return null;
     const single_alloc = objc.msgSend(?objc.Id, single_cls, objc.sel("alloc"), .{}) orelse return null;
