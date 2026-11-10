@@ -3,7 +3,7 @@
 //! put the command in a shell line never have to quote it.
 //!
 //!   {
-//!     "mounts": [{"source": "/Users/me/site", "destination": "/usr/share/nginx/html"}],
+//!     "mounts": [{"source": "/Users/me/site", "destination": "/usr/share/nginx/html", "read_only": true}],
 //!     "ports": [{"host": 8080, "container": 80}],
 //!     "memory": "256M",
 //!     "cpus": 1
@@ -11,7 +11,8 @@
 //!
 //! The rest: env (["KEY=value"]), user, workdir, entrypoint, cmd, and limits
 //! (nofile, nproc, pids, io_weight, cpu_quota).
-//! Every field is optional. Mount sources are host paths, used as given.
+//! Every field is optional. Mount sources are host paths, used as given; a
+//! mount is writable unless it says "read_only": true.
 
 const std = @import("std");
 
@@ -24,6 +25,7 @@ pub const Port = struct {
 pub const Mount = struct {
     source: []const u8,
     destination: []const u8,
+    read_only: bool = false,
 };
 
 pub const Limits = struct {
@@ -57,13 +59,14 @@ test "a run spec takes every field, and none" {
     const a = arena.allocator();
     const full = try parseRunSpec(a,
         \\{"entrypoint":"/e.sh","cmd":"serve","workdir":"/app","user":"999",
-        \\ "env":["A=1"],"mounts":[{"source":"/h","destination":"/g"}],
+        \\ "env":["A=1"],"mounts":[{"source":"/h","destination":"/g","read_only":true}],
         \\ "ports":[{"host":8080,"container":80}],"memory":"1G","cpus":1.5,
         \\ "limits":{"nofile":4096,"pids":64,"cpu_quota":"50%"}}
     );
     try std.testing.expectEqualStrings("/e.sh", full.entrypoint.?);
     try std.testing.expectEqualStrings("A=1", full.env[0]);
     try std.testing.expectEqualStrings("/g", full.mounts[0].destination);
+    try std.testing.expect(full.mounts[0].read_only);
     try std.testing.expectEqual(8080, full.ports[0].host);
     try std.testing.expectEqual(64, full.limits.pids.?);
     const empty = try parseRunSpec(a, "{}");
