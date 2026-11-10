@@ -34,7 +34,7 @@ command in a shell line). Serving a folder from your Mac:
 | Field | Meaning |
 |---|---|
 | `env` | `["KEY=value", …]`, added to the image's own |
-| `mounts` | host folders shared into the container: `source` → `destination` |
+| `mounts` | host folders shared into the container: `source` → `destination`, read-only with `"read_only": true` |
 | `ports` | `host` port forwarded to the container's, on `address` (default 127.0.0.1) |
 | `memory`, `cpus` | the VM's size: `256M`, `1G`; vCPUs rounded up |
 | `user`, `workdir` | who the process runs as, and where |
